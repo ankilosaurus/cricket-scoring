@@ -62,13 +62,13 @@ export default function Home() {
     !inn.needsNewBatsman && !inn.needsNewBowler;
 
   const parsePlayers = (t: string) =>
-    t.split("\n").map((s) => s.trim()).filter(Boolean).map((n) => makePlayer(n));
+    t.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean).map((n) => makePlayer(n));
 
   const startMatch = () => {
     const pa = parsePlayers(playersAText);
     const pb = parsePlayers(playersBText);
     if (pa.length < 2 || pb.length < 2) {
-      alert("Add at least 2 players per team (one name per line)");
+      alert("Add at least 2 players per team (one per line, or separated by commas)");
       return;
     }
     setMatch({
@@ -268,7 +268,7 @@ export default function Home() {
             <input value={teamA} onChange={(e) => setTeamA(e.target.value)} />
           </div>
           <div className="form-group">
-            <label>Team A players (one per line)</label>
+            <label>Team A players (one per line, or comma-separated)</label>
             <textarea value={playersAText} onChange={(e) => setPlayersAText(e.target.value)}
               placeholder={"Virat\nRohit\nBumrah"} rows={4} style={taStyle} />
           </div>
@@ -277,7 +277,7 @@ export default function Home() {
             <input value={teamB} onChange={(e) => setTeamB(e.target.value)} />
           </div>
           <div className="form-group">
-            <label>Team B players (one per line)</label>
+            <label>Team B players (one per line, or comma-separated)</label>
             <textarea value={playersBText} onChange={(e) => setPlayersBText(e.target.value)}
               placeholder={"Babar\nRizwan\nShaheen"} rows={4} style={taStyle} />
           </div>
