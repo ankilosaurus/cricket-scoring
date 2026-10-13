@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import type { BallEvent, Match, PlayerStats, Innings } from "../lib/types";
 import {
   makePlayer, emptyInnings, oversStr, runRate, upd, rebuildStats,
@@ -252,7 +252,7 @@ export default function Home() {
     return <div className="container" style={{ paddingTop: 48, textAlign: "center" }}>Loading…</div>;
   }
 
-  const taStyle: React.CSSProperties = {
+  const taStyle: CSSProperties = {
     width: "100%", background: "var(--bg)", border: "1px solid var(--border)",
     color: "var(--text)", borderRadius: 8, padding: 10, fontFamily: "inherit",
     fontSize: "1rem", resize: "vertical",
