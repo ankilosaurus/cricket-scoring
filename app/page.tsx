@@ -178,7 +178,7 @@ export default function Home() {
       const playersA = bs === "A" ? batP : bowlP;
       const playersB = bs === "B" ? batP : bowlP;
 
-      let status = prev.status;
+      let status: Match["status"] = prev.status;
       let winner = prev.winner;
       if (prev.currentInnings === 1) {
         const target = prev.innings[0].runs + 1;
