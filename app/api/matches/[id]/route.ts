@@ -1,0 +1,21 @@
+import { NextResponse } from "next/server";
+import { db, ensureSchema, isDbConfigured } from "@/lib/db";
+import type { Match } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  _req: Request,
+  ctx: { params: { id: string } }
+) {
+  if (!isDbConfigured())
+    return NextResponse.json({ ok: false }, { status: 503 });
+  await ensureSchema();
+  const sql = db();
+  const rows = (await sql`SELECT data FROM matches WHERE id = ${ctx.params.id} LIMIT 1`) as {
+    data: Match;
+  }[];
+  if (!rows.length)
+    return NextResponse.json({ ok: false }, { status: 404 });
+  return NextResponse.json({ ok: true, match: rows[0].data });
+}
