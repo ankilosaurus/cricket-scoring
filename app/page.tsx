@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, type CSSProperties } from "react";
-import type { BallEvent, Match, PlayerStats, Innings } from "../lib/types";
+import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
+import type { BallEvent, Match, MatchSummary, PlayerStats, Innings } from "../lib/types";
 import {
-  makePlayer, emptyInnings, oversStr, runRate, upd, rebuildStats,
+  makePlayer, emptyInnings, oversStr, runRate, upd, rebuildStats, newMatchId,
 } from "../lib/helpers";
 import Scorecard from "./Scorecard";
 
 export default function Home() {
   const [match, setMatch] = useState<Match>({
+    id: newMatchId(),
     teamA: "Team A", teamB: "Team B", playersA: [], playersB: [],
     overs: 5, battingFirst: "A", innings: [emptyInnings(), emptyInnings()],
     currentInnings: 0, status: "setup",
@@ -24,12 +25,16 @@ export default function Home() {
   const [selNonStriker, setSelNonStriker] = useState("");
   const [selBowler, setSelBowler] = useState("");
   const [selNewBat, setSelNewBat] = useState("");
+  const [dbOn, setDbOn] = useState(false);
+  const [history, setHistory] = useState<MatchSummary[]>([]);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem("cricket-match-v2");
       if (raw) {
         const p = JSON.parse(raw) as Match;
+        if (!p.id) p.id = newMatchId();
         setMatch(p); setTeamA(p.teamA); setTeamB(p.teamB); setOvers(p.overs);
         setPlayersAText(p.playersA.map((x) => x.name).join("\n"));
         setPlayersBText(p.playersB.map((x) => x.name).join("\n"));
@@ -40,6 +45,31 @@ export default function Home() {
   useEffect(() => {
     if (loaded) localStorage.setItem("cricket-match-v2", JSON.stringify(match));
   }, [match, loaded]);
+
+  // Cloud backup (Neon): check availability, autosave, history.
+  useEffect(() => {
+    fetch("/api/db-status").then((r) => r.json()).then((j) => {
+      if (j && j.ok) setDbOn(true);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!loaded || !dbOn || match.status === "setup") return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      fetch("/api/matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(match),
+      }).catch(() => {});
+    }, 1500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [match, loaded, dbOn]);
+  useEffect(() => {
+    if (!dbOn) return;
+    fetch("/api/matches").then((r) => r.json()).then((j) => {
+      if (j && j.ok) setHistory(j.matches as MatchSummary[]);
+    }).catch(() => {});
+  }, [dbOn, match.status]);
 
   const inn = match.innings[match.currentInnings];
   const maxBalls = match.overs * 6;
@@ -72,6 +102,7 @@ export default function Home() {
       return;
     }
     setMatch({
+      id: newMatchId(),
       teamA: teamA.trim() || "Team A", teamB: teamB.trim() || "Team B",
       playersA: pa, playersB: pb, overs, battingFirst: "A",
       innings: [emptyInnings(), emptyInnings()], currentInnings: 0, status: "select-openers",
@@ -240,12 +271,31 @@ export default function Home() {
   const reset = () => {
     localStorage.removeItem("cricket-match-v2");
     setMatch({
+      id: newMatchId(),
       teamA: "Team A", teamB: "Team B", playersA: [], playersB: [],
       overs: 5, battingFirst: "A", innings: [emptyInnings(), emptyInnings()],
       currentInnings: 0, status: "setup",
     });
     setTeamA("Team A"); setTeamB("Team B"); setOvers(5);
     setPlayersAText(""); setPlayersBText(""); setShowCard(false);
+  };
+
+  const loadMatch = async (id: string) => {
+    try {
+      const r = await fetch(`/api/matches/${id}`);
+      const j = await r.json();
+      if (j && j.ok && j.match) {
+        const m = j.match as Match;
+        if (!m.id) m.id = id;
+        setMatch(m);
+        setTeamA(m.teamA); setTeamB(m.teamB); setOvers(m.overs);
+        setPlayersAText(m.playersA.map((x) => x.name).join("\n"));
+        setPlayersBText(m.playersB.map((x) => x.name).join("\n"));
+        setSelStriker(""); setSelNonStriker(""); setSelBowler(""); setSelNewBat("");
+        setShowCard(false);
+        window.scrollTo(0, 0);
+      }
+    } catch {}
   };
 
   if (!loaded) {
@@ -291,8 +341,34 @@ export default function Home() {
           </div>
           <button className="btn btn-primary" style={{ width: "100%" }} onClick={startMatch}>Start Match</button>
         </div>
+        {dbOn && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <h2>Past matches</h2>
+            {history.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+                No saved matches yet — they appear here automatically.
+              </p>
+            ) : (
+              history.map((h) => (
+                <button key={h.id} onClick={() => loadMatch(h.id)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    background: "var(--bg)", border: "1px solid var(--border)",
+                    borderRadius: 8, padding: "10px 12px", marginBottom: 8,
+                    color: "var(--text)", fontFamily: "inherit", cursor: "pointer",
+                  }}>
+                  <div style={{ fontWeight: 600 }}>{h.teamA} vs {h.teamB}</div>
+                  <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+                    {h.winner ? (h.winner === "Tie" ? "Tie" : `${h.winner} won`) : h.status.replace("-", " ")}
+                    {" · "}{new Date(h.updatedAt).toLocaleDateString()}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
         <p style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
-          Batting & bowling stats · Saves in browser
+          Batting & bowling stats · Saves in browser{dbOn ? " · ☁ Cloud backup on" : ""}
         </p>
       </div>
     );
