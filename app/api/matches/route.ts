@@ -8,12 +8,25 @@ export async function GET() {
   if (!isDbConfigured()) return NextResponse.json({ ok: false, matches: [] });
   await ensureSchema();
   const sql = db();
-  const rows = await sql(
-    `SELECT id, team_a AS "teamA", team_b AS "teamB", winner, status,
-            updated_at AS "updatedAt"
-     FROM matches ORDER BY updated_at DESC LIMIT 50`
-  );
-  return NextResponse.json({ ok: true, matches: rows });
+  const rows = (await sql`
+    SELECT id, team_a AS "teamA", team_b AS "teamB", winner, status,
+           batting_first AS "battingFirst",
+           (data->'innings'->0->>'runs')::int AS "r1",
+           (data->'innings'->0->>'wickets')::int AS "w1",
+           (data->'innings'->0->>'balls')::int AS "b1",
+           (data->'innings'->1->>'runs')::int AS "r2",
+           (data->'innings'->1->>'wickets')::int AS "w2",
+           (data->'innings'->1->>'balls')::int AS "b2",
+           updated_at AS "updatedAt"
+    FROM matches ORDER BY updated_at DESC LIMIT 50
+  `) as Record<string, any>[];
+  const matches = rows.map((r) => ({
+    id: r.id, teamA: r.teamA, teamB: r.teamB, winner: r.winner ?? undefined,
+    status: r.status, updatedAt: r.updatedAt, battingFirst: r.battingFirst,
+    inns1: { runs: r.r1 ?? 0, wickets: r.w1 ?? 0, balls: r.b1 ?? 0 },
+    inns2: { runs: r.r2 ?? 0, wickets: r.w2 ?? 0, balls: r.b2 ?? 0 },
+  }));
+  return NextResponse.json({ ok: true, matches });
 }
 
 export async function POST(req: Request) {

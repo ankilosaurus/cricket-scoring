@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
-import type { BallEvent, Match, MatchSummary, PlayerStats, Innings } from "../lib/types";
+import { useState, useEffect, useCallback, useRef, type CSSProperties, type ReactNode } from "react";
+import type { BallEvent, Match, PlayerStats, Innings } from "../lib/types";
 import {
   makePlayer, emptyInnings, oversStr, runRate, upd, rebuildStats, newMatchId,
 } from "../lib/helpers";
 import Scorecard from "./Scorecard";
+import TabBar, { type Tab } from "./components/TabBar";
+import MatchesTab from "./components/MatchesTab";
+import StatsTab from "./components/StatsTab";
 
 export default function Home() {
   const [match, setMatch] = useState<Match>({
@@ -26,7 +29,7 @@ export default function Home() {
   const [selBowler, setSelBowler] = useState("");
   const [selNewBat, setSelNewBat] = useState("");
   const [dbOn, setDbOn] = useState(false);
-  const [history, setHistory] = useState<MatchSummary[]>([]);
+  const [tab, setTab] = useState<Tab>("scorer");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -64,12 +67,6 @@ export default function Home() {
     }, 1500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [match, loaded, dbOn]);
-  useEffect(() => {
-    if (!dbOn) return;
-    fetch("/api/matches").then((r) => r.json()).then((j) => {
-      if (j && j.ok) setHistory(j.matches as MatchSummary[]);
-    }).catch(() => {});
-  }, [dbOn, match.status]);
 
   const inn = match.innings[match.currentInnings];
   const maxBalls = match.overs * 6;
@@ -280,22 +277,14 @@ export default function Home() {
     setPlayersAText(""); setPlayersBText(""); setShowCard(false);
   };
 
-  const loadMatch = async (id: string) => {
-    try {
-      const r = await fetch(`/api/matches/${id}`);
-      const j = await r.json();
-      if (j && j.ok && j.match) {
-        const m = j.match as Match;
-        if (!m.id) m.id = id;
-        setMatch(m);
-        setTeamA(m.teamA); setTeamB(m.teamB); setOvers(m.overs);
-        setPlayersAText(m.playersA.map((x) => x.name).join("\n"));
-        setPlayersBText(m.playersB.map((x) => x.name).join("\n"));
-        setSelStriker(""); setSelNonStriker(""); setSelBowler(""); setSelNewBat("");
-        setShowCard(false);
-        window.scrollTo(0, 0);
-      }
-    } catch {}
+  const resumeMatch = (m: Match) => {
+    setMatch(m);
+    setTeamA(m.teamA); setTeamB(m.teamB); setOvers(m.overs);
+    setPlayersAText(m.playersA.map((x) => x.name).join("\n"));
+    setPlayersBText(m.playersB.map((x) => x.name).join("\n"));
+    setSelStriker(""); setSelNonStriker(""); setSelBowler(""); setSelNewBat("");
+    setShowCard(false);
+    setTab("scorer");
   };
 
   if (!loaded) {
@@ -308,8 +297,13 @@ export default function Home() {
     fontSize: "1rem", resize: "vertical",
   };
 
+  const target = match.currentInnings === 1 ? match.innings[0].runs + 1 : null;
+  const needed = target !== null ? Math.max(0, target - inn.runs) : null;
+  const ballsLeft = maxBalls - inn.balls;
+
+  let scorerView: ReactNode;
   if (match.status === "setup") {
-    return (
+    scorerView = (
       <div className="container">
         <h1>🏏 Cricket Scorer</h1>
         <div className="card">
@@ -341,42 +335,14 @@ export default function Home() {
           </div>
           <button className="btn btn-primary" style={{ width: "100%" }} onClick={startMatch}>Start Match</button>
         </div>
-        {dbOn && (
-          <div className="card" style={{ marginTop: 12 }}>
-            <h2>Past matches</h2>
-            {history.length === 0 ? (
-              <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-                No saved matches yet — they appear here automatically.
-              </p>
-            ) : (
-              history.map((h) => (
-                <button key={h.id} onClick={() => loadMatch(h.id)}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    background: "var(--bg)", border: "1px solid var(--border)",
-                    borderRadius: 8, padding: "10px 12px", marginBottom: 8,
-                    color: "var(--text)", fontFamily: "inherit", cursor: "pointer",
-                  }}>
-                  <div style={{ fontWeight: 600 }}>{h.teamA} vs {h.teamB}</div>
-                  <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                    {h.winner ? (h.winner === "Tie" ? "Tie" : `${h.winner} won`) : h.status.replace("-", " ")}
-                    {" · "}{new Date(h.updatedAt).toLocaleDateString()}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        )}
         <p style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
           Batting & bowling stats · Saves in browser{dbOn ? " · ☁ Cloud backup on" : ""}
         </p>
       </div>
     );
-  }
-
-  if (match.status === "select-openers") {
+  } else if (match.status === "select-openers") {
     const bp = batPlayers(); const bwp = bowlPlayers();
-    return (
+    scorerView = (
       <div className="container">
         <h1>Select players</h1>
         <div className="card">
@@ -411,10 +377,8 @@ export default function Home() {
         </div>
       </div>
     );
-  }
-
-  if (match.status === "finished") {
-    return (
+  } else if (match.status === "finished") {
+    scorerView = (
       <div className="container">
         <h1>🏏 Match Over</h1>
         <div className="card score-display">
@@ -436,11 +400,9 @@ export default function Home() {
         {showCard && <Scorecard match={match} onClose={() => setShowCard(false)} />}
       </div>
     );
-  }
-
-  if (inn.needsNewBatsman) {
+  } else if (inn.needsNewBatsman) {
     const avail = batPlayers().filter((p) => !p.out && p.id !== inn.strikerId && p.id !== inn.nonStrikerId);
-    return (
+    scorerView = (
       <div className="container">
         <h1>New batsman</h1>
         <div className="card">
@@ -458,10 +420,8 @@ export default function Home() {
         </div>
       </div>
     );
-  }
-
-  if (inn.needsNewBowler && !inningsOver) {
-    return (
+  } else if (inn.needsNewBowler && !inningsOver) {
+    scorerView = (
       <div className="container">
         <h1>End of over</h1>
         <div className="card">
@@ -485,13 +445,8 @@ export default function Home() {
         </div>
       </div>
     );
-  }
-
-  const target = match.currentInnings === 1 ? match.innings[0].runs + 1 : null;
-  const needed = target !== null ? Math.max(0, target - inn.runs) : null;
-  const ballsLeft = maxBalls - inn.balls;
-
-  return (
+  } else {
+    scorerView = (
     <div className="container">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <span className="badge">Inn {match.currentInnings + 1} · {match.overs} ov</span>
@@ -595,6 +550,16 @@ export default function Home() {
         </>
       )}
       {showCard && <Scorecard match={match} onClose={() => setShowCard(false)} />}
+    </div>
+    );
+  }
+
+  return (
+    <div className="page-pad">
+      {tab === "scorer" && scorerView}
+      {tab === "matches" && <MatchesTab dbOn={dbOn} onResume={resumeMatch} />}
+      {tab === "stats" && <StatsTab dbOn={dbOn} />}
+      <TabBar tab={tab} setTab={setTab} />
     </div>
   );
 }
