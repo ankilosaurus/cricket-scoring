@@ -54,4 +54,20 @@ export type MatchSummary = {
   winner?: string;
   status: Match["status"];
   updatedAt: string;
+  battingFirst: "A" | "B";
+  inns1: { runs: number; wickets: number; balls: number };
+  inns2: { runs: number; wickets: number; balls: number };
+};
+
+export type PlayerAgg = {
+  name: string;
+  matches: number;
+  runs: number;
+  balls: number;
+  fours: number;
+  sixes: number;
+  dismissals: number;
+  ballsBowled: number;
+  runsConceded: number;
+  wickets: number;
 };
