@@ -24,11 +24,13 @@ export default function Home() {
   const [playersBText, setPlayersBText] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [showCard, setShowCard] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [selStriker, setSelStriker] = useState("");
   const [selNonStriker, setSelNonStriker] = useState("");
   const [selBowler, setSelBowler] = useState("");
   const [selNewBat, setSelNewBat] = useState("");
   const [dbOn, setDbOn] = useState(false);
+  const [dbDebug, setDbDebug] = useState("");
   const [tab, setTab] = useState<Tab>("scorer");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -53,7 +55,8 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/db-status").then((r) => r.json()).then((j) => {
       if (j && j.ok) setDbOn(true);
-    }).catch(() => {});
+      else setDbDebug(`debug: found=[${(j?.found || []).join(",")}] storeKeys=[${(j?.storeKeys || []).join(",")}]`);
+    }).catch(() => setDbDebug("debug: status fetch failed"));
   }, []);
   useEffect(() => {
     if (!loaded || !dbOn || match.status === "setup") return;
@@ -277,7 +280,13 @@ export default function Home() {
     setPlayersAText(""); setPlayersBText(""); setShowCard(false);
   };
 
+  const endMatch = (winner: string) => {
+    setMatch((prev) => ({ ...prev, status: "finished" as const, winner }));
+    setEnding(false);
+  };
+
   const resumeMatch = (m: Match) => {
+    setEnding(false);
     setMatch(m);
     setTeamA(m.teamA); setTeamB(m.teamB); setOvers(m.overs);
     setPlayersAText(m.playersA.map((x) => x.name).join("\n"));
@@ -338,6 +347,11 @@ export default function Home() {
         <p style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
           Batting & bowling stats · Saves in browser{dbOn ? " · ☁ Cloud backup on" : ""}
         </p>
+        {!dbOn && dbDebug ? (
+          <p style={{ textAlign: "center", color: "var(--warn)", fontSize: "0.75rem", marginTop: 4 }}>
+            {dbDebug}
+          </p>
+        ) : null}
       </div>
     );
   } else if (match.status === "select-openers") {
@@ -373,6 +387,9 @@ export default function Home() {
           <button className="btn btn-primary" style={{ width: "100%" }}
             disabled={!selStriker || !selNonStriker || !selBowler} onClick={confirmOpeners}>
             Begin Innings
+          </button>
+          <button className="back-btn" style={{ marginTop: 8, marginBottom: 0 }} onClick={reset}>
+            ‹ Back to setup
           </button>
         </div>
       </div>
@@ -441,6 +458,37 @@ export default function Home() {
           </div>
           <button className="btn btn-primary" style={{ width: "100%" }} disabled={!selBowler} onClick={confirmNewBowler}>
             Start next over
+          </button>
+        </div>
+      </div>
+    );
+  } else if (ending) {
+    scorerView = (
+      <div className="container">
+        <h1>End match?</h1>
+        <div className="card">
+          <p style={{ color: "var(--muted)", marginBottom: 4 }}>The current score stands.</p>
+          <div className="score-display" style={{ padding: "12px 8px" }}>
+            <div style={{ fontSize: "1.15rem", fontWeight: 700 }}>
+              {battingTeam} {inn.runs}/{inn.wickets} ({oversStr(inn.balls)})
+            </div>
+          </div>
+          <p style={{ color: "var(--muted)", marginBottom: 12 }}>Who won?</p>
+          <button className="btn btn-primary" style={{ width: "100%", marginBottom: 8 }}
+            onClick={() => endMatch(match.teamA)}>
+            {match.teamA} won
+          </button>
+          <button className="btn btn-primary" style={{ width: "100%", marginBottom: 8 }}
+            onClick={() => endMatch(match.teamB)}>
+            {match.teamB} won
+          </button>
+          <button className="btn btn-secondary" style={{ width: "100%", marginBottom: 8 }}
+            onClick={() => endMatch("Tie")}>
+            Tie
+          </button>
+          <button className="btn btn-secondary" style={{ width: "100%" }}
+            onClick={() => setEnding(false)}>
+            Cancel
           </button>
         </div>
       </div>
@@ -547,6 +595,10 @@ export default function Home() {
           <div className="actions">
             <button className="btn btn-secondary" disabled={!inn.events.length} onClick={undo}>Undo</button>
           </div>
+          <button className="btn btn-secondary" style={{ width: "100%", marginTop: 8, opacity: 0.75 }}
+            onClick={() => setEnding(true)}>
+            End match…
+          </button>
         </>
       )}
       {showCard && <Scorecard match={match} onClose={() => setShowCard(false)} />}

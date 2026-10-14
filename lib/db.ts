@@ -1,15 +1,20 @@
 import { neon } from "@neondatabase/serverless";
 
+// Keep in sync with app/api/db-status/route.ts diagnostics.
+export const DB_URL_KEYS = [
+  "DATABASE_URL",
+  "POSTGRES_URL",
+  // Vercel marketplace stores use a prefixed name, e.g. CRICKET_SCORE_STORE_POSTGRES_URL
+  "CRICKET_SCORE_STORE_POSTGRES_URL",
+  "CRICKET_SCORE_STORE_DATABASE_URL",
+  "CRICKET_SCORE_STORE_POSTGRES_PRISMA_URL",
+];
+
 function dbUrl(): string | null {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    // Vercel marketplace stores use a prefixed name, e.g. CRICKET_SCORE_STORE_POSTGRES_URL
-    process.env.CRICKET_SCORE_STORE_POSTGRES_URL ||
-    process.env.CRICKET_SCORE_STORE_DATABASE_URL ||
-    process.env.CRICKET_SCORE_STORE_POSTGRES_PRISMA_URL ||
-    null
-  );
+  for (const k of DB_URL_KEYS) {
+    if (process.env[k]) return process.env[k] as string;
+  }
+  return null;
 }
 
 export function isDbConfigured(): boolean {
