@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { db, ensureSchema, isDbConfigured } from "@/lib/db";
+import { isAuthed } from "@/lib/auth";
 import type { Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!isAuthed()) return NextResponse.json({ ok: false }, { status: 401 });
   if (!isDbConfigured()) return NextResponse.json({ ok: false, matches: [] });
   await ensureSchema();
   const sql = db();
@@ -30,6 +32,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!isAuthed()) return NextResponse.json({ ok: false }, { status: 401 });
   if (!isDbConfigured())
     return NextResponse.json({ ok: false, skipped: true });
   const m = (await req.json()) as Match;

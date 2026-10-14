@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { db, ensureSchema, isDbConfigured } from "@/lib/db";
+import { isAuthed } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // Career aggregates per player name across all saved matches.
 export async function GET() {
+  if (!isAuthed()) return NextResponse.json({ ok: false }, { status: 401 });
   if (!isDbConfigured()) return NextResponse.json({ ok: false, players: [] });
   await ensureSchema();
   const sql = db();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, ensureSchema, isDbConfigured } from "@/lib/db";
+import { isAuthed } from "@/lib/auth";
 import type { Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ export async function GET(
   _req: Request,
   ctx: { params: { id: string } }
 ) {
+  if (!isAuthed()) return NextResponse.json({ ok: false }, { status: 401 });
   if (!isDbConfigured())
     return NextResponse.json({ ok: false }, { status: 503 });
   await ensureSchema();
@@ -24,6 +26,7 @@ export async function DELETE(
   _req: Request,
   ctx: { params: { id: string } }
 ) {
+  if (!isAuthed()) return NextResponse.json({ ok: false }, { status: 401 });
   if (!isDbConfigured())
     return NextResponse.json({ ok: false }, { status: 503 });
   await ensureSchema();

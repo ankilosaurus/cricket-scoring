@@ -31,6 +31,9 @@ export default function Home() {
   const [selNewBat, setSelNewBat] = useState("");
   const [dbOn, setDbOn] = useState(false);
   const [dbDebug, setDbDebug] = useState("");
+  const [auth, setAuth] = useState<"checking" | "locked" | "open">("checking");
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState("");
   const [tab, setTab] = useState<Tab>("scorer");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,6 +54,31 @@ export default function Home() {
     if (loaded) localStorage.setItem("cricket-match-v2", JSON.stringify(match));
   }, [match, loaded]);
 
+  // PIN lock: check session on load. Inactive until APP_PIN is set server-side.
+  useEffect(() => {
+    fetch("/api/auth").then((r) => r.json()).then((j) => {
+      setAuth(j && j.ok ? "open" : "locked");
+    }).catch(() => setAuth("locked"));
+  }, []);
+  const submitPin = async () => {
+    setPinError("");
+    try {
+      const r = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const j = await r.json();
+      if (j && j.ok) {
+        setAuth("open");
+        setPin("");
+      } else {
+        setPinError("Wrong PIN — try again.");
+      }
+    } catch {
+      setPinError("Couldn't check the PIN. Try again.");
+    }
+  };
   // Cloud backup (Neon): check availability, autosave, history.
   useEffect(() => {
     fetch("/api/db-status").then((r) => r.json()).then((j) => {
@@ -296,8 +324,37 @@ export default function Home() {
     setTab("scorer");
   };
 
-  if (!loaded) {
+  if (auth === "checking" || !loaded) {
     return <div className="container" style={{ paddingTop: 48, textAlign: "center" }}>Loading…</div>;
+  }
+
+  if (auth === "locked") {
+    return (
+      <div className="container" style={{ paddingTop: 64 }}>
+        <h1>🏏 Cricket Scorer</h1>
+        <div className="card">
+          <div className="form-group">
+            <label>This scorer is private — enter the PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submitPin(); }}
+              placeholder="PIN"
+            />
+          </div>
+          {pinError ? (
+            <p style={{ color: "var(--danger)", marginBottom: 8 }}>{pinError}</p>
+          ) : null}
+          <button className="btn btn-primary" style={{ width: "100%" }}
+            onClick={submitPin} disabled={!pin}>
+            Unlock
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const taStyle: CSSProperties = {
