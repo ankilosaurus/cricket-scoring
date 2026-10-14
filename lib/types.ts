@@ -34,6 +34,7 @@ export type Innings = {
 };
 
 export type Match = {
+  id: string;
   teamA: string;
   teamB: string;
   playersA: PlayerStats[];
@@ -44,4 +45,13 @@ export type Match = {
   currentInnings: 0 | 1;
   status: "setup" | "select-openers" | "live" | "finished";
   winner?: string;
+};
+
+export type MatchSummary = {
+  id: string;
+  teamA: string;
+  teamB: string;
+  winner?: string;
+  status: Match["status"];
+  updatedAt: string;
 };
