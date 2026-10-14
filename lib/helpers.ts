@@ -1,7 +1,10 @@
 import type { BallEvent, Match, PlayerStats, Innings } from "./types";
 
-export function makePlayer(name: string, id?: string): PlayerStats {
-  return {
+export function newMatchId(): string {
+  return `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function makePlayer(name: string, id?: string): PlayerStats {  return {
     id: id || `p_${Math.random().toString(36).slice(2, 9)}`,
     name,
     runs: 0,
