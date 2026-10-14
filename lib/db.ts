@@ -4,6 +4,10 @@ function dbUrl(): string | null {
   return (
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL ||
+    // Vercel marketplace stores use a prefixed name, e.g. CRICKET_SCORE_STORE_POSTGRES_URL
+    process.env.CRICKET_SCORE_STORE_POSTGRES_URL ||
+    process.env.CRICKET_SCORE_STORE_DATABASE_URL ||
+    process.env.CRICKET_SCORE_STORE_POSTGRES_PRISMA_URL ||
     null
   );
 }
